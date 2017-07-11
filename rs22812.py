@@ -270,10 +270,11 @@ class RS22812(object):
     continuity = None  # True = closed circuit, False = open circuit
 
 
-    def __init__(self, port):
+    def __init__(self, port, error_verbose=True):
         self.port = port
         baudrate = 4800
         self.sp = serial.Serial(port, baudrate, timeout=0)
+        self.error_verbose = error_verbose
 
     def __del__(self):
         if self.sp:
@@ -293,25 +294,74 @@ class RS22812(object):
             Purge the port
         However, we continue to loop until we do get a good packet.
         '''
-        sleep_time = 1  # seconds
+        # sleep_time = 1  # seconds
+        sleep_time = 0.02  # seconds
         good_packet = False
+        # while not good_packet:
+        #     self.sp.flushInput()
+        #     sleep(sleep_time)
+        #     self.sp.dtr = True
+        #     packet = self.sp.read(9)
+        #     if len(packet) != 9:
+        #         self.sp.dtr = False
+        #         sleep(sleep_time)
+        #         continue
+        #     if not self.valid_checksum(packet):
+        #         self.sp.dtr = False
+        #         sleep(sleep_time)
+        #         continue
+        #     good_packet = True
+        #     self.sp.dtr = False
+        #     sleep(sleep_time)
+        #     self.sp.flushInput()
+        # return packet
+
+        # print(self.sp.in_waiting)
+        # self.sp.reset_input_buffer()
+        # self.sp.dtr = True
+        # while not good_packet:
+        #     sleep(sleep_time)
+        #     self.sp.dtr = True
+        #     if self.sp.in_waiting < 9:
+        #         # print(self.sp.in_waiting)
+        #         # self.sp.dtr = False
+        #         continue
+        #     if self.sp.in_waiting > 9:
+        #         print(self.sp.in_waiting)
+        #         self.sp.dtr = False
+        #         self.sp.reset_input_buffer()
+        #         continue            
+        #     packet = self.sp.read(9)
+
+        #     if not self.valid_checksum(packet):
+        #         self.sp.dtr = False
+        #         self.sp.reset_input_buffer()
+        #         continue
+        #     good_packet = True
+        #     # self.sp.dtr = False
+        #     sleep(sleep_time/2)
+        #     # self.sp.reset_input_buffer()
+        # # print(self.sp.in_waiting)
+        # return packet
+
+        self.sp.reset_input_buffer()
+        self.sp.dtr = True
+        self.sp.inter_byte_timeout = 1.0 # ???
+        packet = []
         while not good_packet:
-            self.sp.flushInput()
             sleep(sleep_time)
-            self.sp.setDTR(level=True)
-            packet = self.sp.read(9)
-            if len(packet) != 9:
-                self.sp.setDTR(level=False)
-                sleep(sleep_time)
+            temp = self.sp.read()
+            packet += temp
+            if len(packet) < 9:
+                continue
+            elif len(packet) > 9:
+                print(len(packet))
+                # self.sp.reset_input_buffer()
+                packet = []
                 continue
             if not self.valid_checksum(packet):
-                self.sp.setDTR(level=False)
-                sleep(sleep_time)
                 continue
             good_packet = True
-            self.sp.setDTR(level=False)
-            sleep(sleep_time)
-            self.sp.flushInput()
         return packet
 
     def valid_checksum(self, packet):
@@ -323,7 +373,8 @@ class RS22812(object):
         checksum_calculated = (sum(packet[:-1]) + constant) & 255
         checksum_received   = packet[8]
         if checksum_calculated != checksum_received:
-            print("ERROR, checksum failed. Expected {0}, got {1}".format(checksum_calculated, checksum_received))
+            if self.error_verbose:
+                print("ERROR, checksum failed. Expected {0}, got {1}".format(checksum_calculated, checksum_received))
             return False
         else:
             return True
@@ -358,7 +409,8 @@ class RS22812(object):
         try:
             digits = float(digits_str)
         except ValueError:
-            print("ERROR converting digits to float.", \
+            if self.error_verbose:
+                print("ERROR converting digits to float.", \
                   "digits:", digits, \
                   ", decimal_location:", decimal_location)
             digits = 0.0
@@ -388,7 +440,8 @@ class RS22812(object):
         '''
 
         if response_str == None:
-            print("ERROR: response string was empty")
+            if self.error_verbose:
+                print("ERROR: response string was empty")
             return
 
         # response = [ord(i) for i in response_str]
@@ -602,14 +655,13 @@ class RS22812(object):
             elif digits[3] == "F":
                 self.units_scale = self.UNITS_SCALE_FAHRENHEIT
             else:
-                print("ERROR: temperature digits does not end in C or F.", \
+                if self.error_verbose:
+                    print("ERROR: temperature digits does not end in C or F.", \
                       "digits:", digits)
             self.digits = self.digits_to_number(digits[:3] + ['0'], decimal_location, self.sign)
         else:
             # in all other cases, digits contains a number
             self.digits = self.digits_to_number(digits, decimal_location, self.sign)
-            
-
 
     def DumpPacket(self, packet):
         s = ""
@@ -628,7 +680,6 @@ class RS22812(object):
     #    if 1:
     #        print("Reading: %s, Dial: %s, Modifiers: %s" % (reading, dial, modifiers))
     #    return self.InterpretReading(packet)
-
 
     def interpret_reading(self):
         extra = ''
@@ -687,19 +738,22 @@ class RS22812(object):
 ### MAIN
 ###
 
-def main(port, interval):
+def main(port, interval, verbose):
     # Immediately start taking readings and printing to stdout.
 
-    if (port == None):
+    if port == None:
         # attempt to supply something intelligent for os for a default
         import os
         if os.name == 'nt':
-            port = 'COM5'
+            port = 'COM2'
         else:
             port = '/dev/ttyS0'
         print("rs22812 main:  no port option specified:  port set to", port)
-        
-    rs = RS22812(port)
+    
+    if verbose == None:
+        verbose = 1
+
+    rs = RS22812(port, error_verbose=(verbose>0))
 
     count = 0
     while True:
@@ -709,7 +763,8 @@ def main(port, interval):
         #r = rs.GetReading()
         #print(now_str + " [%d]" % count, r)
         rs.parse_response(packet)
-        # rs.debug()
+        if verbose > 1:
+            rs.debug()
         reading = rs.interpret_reading()
         print(now_str, reading)
         sleep(interval)
@@ -727,9 +782,9 @@ if __name__ == "__main__":
 
     parser.add_option("-p", "--port",
         dest = "port",
-        help = "port device string: examples:  " +
-               "Unix-like: /dev/ttyS0, " +
-               "Windows: COM1 [defaults to one of these values]"
+        help = "port device [defaults to one of these values]: " +
+               "Unix-like (/dev/ttyS0) or " +
+               "Windows (COM2)"
     )
 
     parser.add_option("-i", "--interval",
@@ -739,8 +794,15 @@ if __name__ == "__main__":
         help = "interval in seconds between readings [default: %default]"
     )
 
+    parser.add_option("-v", "--verbose",
+        action='count',
+        dest = "verbose",
+        help = "print error messages, use -vv for debug messages as well"
+    )
+
     (options, args) = parser.parse_args()
     port = options.port
     interval = options.interval
+    verbose = options.verbose
 
-    main(port, interval)
+    main(port, interval, verbose)
