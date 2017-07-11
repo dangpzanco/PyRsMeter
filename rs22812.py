@@ -318,10 +318,12 @@ class RS22812(object):
         # I have no idea why the article adds constant 57 to the  
         # checksum, but it seems to work.
         constant = 57
-        checksum_calculated = (sum([ord(c) for c in packet[:-1]]) + constant) & 255
-        checksum_received   = ord(packet[8])
+        # checksum_calculated = (sum([ord(c) for c in packet[:-1]]) + constant) & 255
+        # checksum_received   = ord(packet[8])
+        checksum_calculated = (sum(packet[:-1]) + constant) & 255
+        checksum_received   = packet[8]
         if checksum_calculated != checksum_received:
-            print "ERROR, checksum failed. Expected %d, got %d" % (checksum_calculated, checksum_received)
+            print("ERROR, checksum failed. Expected {0}, got {1}".format(checksum_calculated, checksum_received))
             return False
         else:
             return True
@@ -348,20 +350,20 @@ class RS22812(object):
           point from the left side.
         - Sign is -1 (for a negative number) or +1 (for positive)
         '''
-        #print "+++", digits, decimal_location, sign
+        #print("+++", digits, decimal_location, sign)
         if decimal_location: 
             digits.insert(decimal_location, ".")
         digits_str = ''.join(digits)
-        #print "+++", digits_str
+        #print("+++", digits_str)
         try:
             digits = float(digits_str)
         except ValueError:
-            print "ERROR converting digits to float.", \
+            print("ERROR converting digits to float.", \
                   "digits:", digits, \
-                  ", decimal_location:", decimal_location
+                  ", decimal_location:", decimal_location)
             digits = 0.0
         digits = digits * sign
-        #print "+++ returning", digits 
+        #print("+++ returning", digits)
         return digits
 
     def parse_response(self, response_str):
@@ -386,10 +388,11 @@ class RS22812(object):
         '''
 
         if response_str == None:
-            print "ERROR: response string was empty"
+            print("ERROR: response string was empty")
             return
 
-        response = [ord(i) for i in response_str]
+        # response = [ord(i) for i in response_str]
+        response = response_str
 
         #####################
         ### response byte 0 
@@ -599,8 +602,8 @@ class RS22812(object):
             elif digits[3] == "F":
                 self.units_scale = self.UNITS_SCALE_FAHRENHEIT
             else:
-                print "ERROR: temperature digits does not end in C or F.", \
-                      "digits:", digits
+                print("ERROR: temperature digits does not end in C or F.", \
+                      "digits:", digits)
             self.digits = self.digits_to_number(digits[:3] + ['0'], decimal_location, self.sign)
         else:
             # in all other cases, digits contains a number
@@ -611,7 +614,8 @@ class RS22812(object):
     def DumpPacket(self, packet):
         s = ""
         for i in xrange(len(packet)):
-            s += "%3d " % ord(packet[i]) 
+            # s += "%3d " % ord(packet[i])
+            s += "%3d " % packet[i]
         return s
 
     #def GetReading(self):
@@ -619,10 +623,10 @@ class RS22812(object):
     #    # reading, return None.
     #    packet = self.get_packet()
     #    if 0:  # Turn on to see individual bytes
-    #        print self.DumpPacket(packet)
+    #        print(self.DumpPacket(packet))
     #    reading, dial, modifiers = self.InterpretReading(packet)
     #    if 1:
-    #        print "Reading: %s, Dial: %s, Modifiers: %s" % (reading, dial, modifiers)
+    #        print("Reading: %s, Dial: %s, Modifiers: %s" % (reading, dial, modifiers))
     #    return self.InterpretReading(packet)
 
 
@@ -654,28 +658,28 @@ class RS22812(object):
         return reading
  
     def debug(self):
-        print "*******************************************************"
-        print "*** Display Readings ***"
-        print "************************"
+        print("*******************************************************")
+        print("*** Display Readings ***")
+        print("************************")
         now_str = strftime("%Y-%m-%d %H:%M:%S") 
-        print now_str
-        print "function dial    : %s (%d)" % (self.dial_label[self.dial], self.dial) 
-        print "digits           :", self.digits_raw
-        print "decimal location :", self.decimal_location
-        print "decimal signfict :",  self.significant_decimals
-        print "units            :", self.units_scale + self.units
-        print "INDICATORS"
-        print "  AC                :", self.indicator_ac
-        print "  Autorange         :", self.indicator_autorange  
-        print "  Hold              :", self.indicator_hold       
-        print "  RS232             :", self.indicator_rs232      
-        print "  Relative          :", self.indicator_relative        
-        print "  Continuity Mode   :", self.indicator_continuity 
-        print "  Diode Mode        :", self.indicator_diode      
-        print "  Min Reading       :", self.indicator_min        
-        print "  Max Reading       :", self.indicator_max        
-        print "  Low Battery       :", self.indicator_battery    
-        print "*******************************************************"
+        print(now_str)
+        print("function dial    : {0} ({1})".format(self.dial_label[self.dial], self.dial) )
+        print("digits           :", self.digits_raw              )
+        print("decimal location :", self.decimal_location        )
+        print("decimal signfict :",  self.significant_decimals   )
+        print("units            :", self.units_scale + self.units)
+        print("INDICATORS"                                       )
+        print("  AC                :", self.indicator_ac         )
+        print("  Autorange         :", self.indicator_autorange  )
+        print("  Hold              :", self.indicator_hold       )
+        print("  RS232             :", self.indicator_rs232      )
+        print("  Relative          :", self.indicator_relative   )
+        print("  Continuity Mode   :", self.indicator_continuity )
+        print("  Diode Mode        :", self.indicator_diode      )
+        print("  Min Reading       :", self.indicator_min        )
+        print("  Max Reading       :", self.indicator_max        )
+        print("  Low Battery       :", self.indicator_battery    )
+        print("*******************************************************")
 
 
 
@@ -690,10 +694,10 @@ def main(port, interval):
         # attempt to supply something intelligent for os for a default
         import os
         if os.name == 'nt':
-            port = 'COM1'
+            port = 'COM5'
         else:
             port = '/dev/ttyS0'
-        print "rs22812 main:  no port option specified:  port set to", port
+        print("rs22812 main:  no port option specified:  port set to", port)
         
     rs = RS22812(port)
 
@@ -703,11 +707,11 @@ def main(port, interval):
         packet = rs.get_packet()
         now_str = strftime("%Y-%m-%d %H:%M:%S") 
         #r = rs.GetReading()
-        #print now_str + " [%d]" % count, r
+        #print(now_str + " [%d]" % count, r)
         rs.parse_response(packet)
-        rs.debug()
+        # rs.debug()
         reading = rs.interpret_reading()
-        print now_str, reading
+        print(now_str, reading)
         sleep(interval)
 
 if __name__ == "__main__":
